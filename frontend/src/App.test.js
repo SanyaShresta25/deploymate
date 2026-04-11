@@ -1,8 +1,21 @@
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { render, screen, waitFor } from "@testing-library/react";
+import App from "./App";
+import axios from "axios";
 
-test('renders learn react link', () => {
+jest.mock("axios");
+
+test("renders dashboard heading", async () => {
+  axios.get.mockResolvedValueOnce({
+    data: {
+      frontend: { status: "running", last_deployed: null },
+    },
+  });
+
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+
+  expect(screen.getByText(/DeployMate Dashboard/i)).toBeInTheDocument();
+
+  await waitFor(() => {
+    expect(screen.getByText(/frontend/i)).toBeInTheDocument();
+  });
 });
