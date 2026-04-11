@@ -1,9 +1,14 @@
 from flask import Flask, jsonify, request
 from datetime import datetime
 from flask_cors import CORS
+import os
 
 app = Flask(__name__)
-CORS(app) 
+CORS(app)
+
+# ===============================
+# DATA (mock for now)
+# ===============================
 services = {
     "frontend": {"status": "running", "last_deployed": None},
     "backend": {"status": "running", "last_deployed": None},
@@ -15,6 +20,11 @@ logs = {
     "backend": [],
     "database": []
 }
+
+# ===============================
+# ROUTES
+# ===============================
+
 @app.route("/")
 def home():
     return {"message": "DeployMate API is running"}
@@ -40,5 +50,10 @@ def deploy(service):
 def get_logs(service):
     return jsonify(logs.get(service, []))
 
+# ===============================
+# RUN APP (IMPORTANT FIX HERE)
+# ===============================
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Render gives PORT
+    app.run(host="0.0.0.0", port=port)
