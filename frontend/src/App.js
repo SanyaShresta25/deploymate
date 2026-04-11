@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
 
@@ -117,15 +117,6 @@ function App() {
   useEffect(() => {
     fetchServices();
   }, []);
-
-  useEffect(() => {
-    if (!autoRefresh) {
-      return undefined;
-    }
-
-    const interval = setInterval(fetchServices, REFRESH_MS);
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
 
   return (
     <main className="app-shell">
