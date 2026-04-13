@@ -15,9 +15,12 @@ function ServiceCard({
   logsLoading,
 }) {
   return (
-    <article className="service-card">
+    <article className={`service-card service-card-${service.status || "unknown"}`}>
       <div className="service-header">
-        <h3>{name}</h3>
+        <div>
+          <p className="service-label">Service</p>
+          <h3>{name}</h3>
+        </div>
         <span className={`status-badge status-${service.status}`}>{service.status}</span>
       </div>
 
@@ -36,9 +39,9 @@ function ServiceCard({
 
       {logsOpen && (
         <div className="logs-panel">
-          <h4>Logs</h4>
+          <h4>Recent Logs</h4>
           {logsLoading ? (
-            <p>Loading logs…</p>
+            <p>Loading logs...</p>
           ) : logs.length === 0 ? (
             <p>No logs yet.</p>
           ) : (
@@ -118,15 +121,43 @@ function App() {
     fetchServices();
   }, []);
 
+  const serviceNames = Object.keys(services);
+  const runningCount = serviceNames.filter((serviceName) => services[serviceName]?.status === "running").length;
+
   return (
     <main className="app-shell">
-      <h1>DeployMate Dashboard</h1>
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Ops Control Center</p>
+          <h1>DeployMate Dashboard</h1>
+          <p className="hero-subtitle">
+            Monitor service health, roll out deployments, and inspect logs from one place.
+          </p>
+        </div>
+        <button className="refresh-btn" onClick={fetchServices} disabled={isLoading}>
+          {isLoading ? "Refreshing..." : "Refresh Services"}
+        </button>
+      </section>
 
-      {isLoading && <p>Loading services…</p>}
+      <section className="stats-grid">
+        <article className="stat-tile">
+          <p>Total Services</p>
+          <strong>{serviceNames.length}</strong>
+        </article>
+        <article className="stat-tile">
+          <p>Running</p>
+          <strong>{runningCount}</strong>
+        </article>
+      </section>
+
+      {isLoading && <p className="state-message">Loading services...</p>}
       {error && <p className="error-banner">{error}</p>}
+      {!isLoading && !error && serviceNames.length === 0 && (
+        <p className="state-message">No services configured yet.</p>
+      )}
 
       <section className="service-grid">
-        {Object.keys(services).map((serviceName) => (
+        {serviceNames.map((serviceName) => (
           <ServiceCard
             key={serviceName}
             name={serviceName}
