@@ -9,8 +9,6 @@ from flask import Flask, g, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -33,6 +31,18 @@ def load_local_env(env_path):
 
 load_local_env(os.path.join(BASE_DIR, ".env"))
 DB_PATH = os.environ.get("DEPLOYMATE_DB_PATH", os.path.join(BASE_DIR, "deploymate.db"))
+
+
+def get_cors_origins():
+    raw_origins = os.environ.get("DEPLOYMATE_ALLOWED_ORIGINS", "*")
+    if raw_origins.strip() == "*":
+        return "*"
+
+    origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+    return origins or "*"
+
+
+CORS(app, resources={r"/*": {"origins": get_cors_origins()}})
 
 
 def get_db():
