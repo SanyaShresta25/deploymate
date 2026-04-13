@@ -1,26 +1,66 @@
-from flask import Flask, jsonify, request
 from datetime import datetime
-from flask_cors import CORS
-import os
 import hmac
+import os
+import sqlite3
+
+from flask import Flask, g, jsonify, request
+from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-# ===============================
-# DATA (mock for now)
-# ===============================
-services = {
-    "frontend": {"status": "running", "last_deployed": None},
-    "backend": {"status": "running", "last_deployed": None},
-    "database": {"status": "running", "last_deployed": None},
-}
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("DEPLOYMATE_DB_PATH", os.path.join(BASE_DIR, "deploymate.db"))
 
-logs = {
-    "frontend": [],
-    "backend": [],
-    "database": []
-}
+
+def get_db():
+    if "db" not in g:
+        g.db = sqlite3.connect(DB_PATH)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(_error):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
+
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS services (
+                name TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                last_deployed TEXT
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS deploy_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                service_name TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (service_name) REFERENCES services(name)
+            )
+            """
+        )
+
+        for service_name in ["frontend", "backend", "database"]:
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO services (name, status, last_deployed)
+                VALUES (?, ?, ?)
+                """,
+                (service_name, "running", None),
+            )
+
+        conn.commit()
 
 
 def get_auth_settings():
@@ -43,21 +83,32 @@ def require_auth():
         return jsonify({"error": "Unauthorized"}), 401
     return None
 
-# ===============================
-# ROUTES
-# ===============================
 
 @app.route("/")
 def home():
     return {"message": "DeployMate API is running"}
 
+
 @app.route("/health")
 def health():
     return {"status": "ok"}
 
+
 @app.route("/services")
 def get_services():
-    return jsonify(services)
+    db = get_db()
+    rows = db.execute(
+        "SELECT name, status, last_deployed FROM services ORDER BY name ASC"
+    ).fetchall()
+
+    payload = {
+        row["name"]: {
+            "status": row["status"],
+            "last_deployed": row["last_deployed"],
+        }
+        for row in rows
+    }
+    return jsonify(payload)
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -85,21 +136,51 @@ def deploy(service):
     if unauthorized:
         return unauthorized
 
-    if service in services:
-        services[service]["status"] = "running"
-        services[service]["last_deployed"] = str(datetime.now())
-        logs[service].append(f"{service} deployed at {datetime.now()}")
-        return {"message": f"{service} deployed"}
-    return {"error": "service not found"}, 404
+    db = get_db()
+    service_row = db.execute("SELECT name FROM services WHERE name = ?", (service,)).fetchone()
+    if not service_row:
+        return {"error": "service not found"}, 404
+
+    now = datetime.utcnow().isoformat(sep=" ")
+    db.execute(
+        "UPDATE services SET status = ?, last_deployed = ? WHERE name = ?",
+        ("running", now, service),
+    )
+    db.execute(
+        """
+        INSERT INTO deploy_logs (service_name, message, created_at)
+        VALUES (?, ?, ?)
+        """,
+        (service, f"{service} deployed at {now}", now),
+    )
+    db.commit()
+
+    return {"message": f"{service} deployed"}
+
 
 @app.route("/logs/<service>")
 def get_logs(service):
-    return jsonify(logs.get(service, []))
+    db = get_db()
+    service_row = db.execute("SELECT name FROM services WHERE name = ?", (service,)).fetchone()
+    if not service_row:
+        return jsonify([])
 
-# ===============================
-# RUN APP (IMPORTANT FIX HERE)
-# ===============================
+    rows = db.execute(
+        """
+        SELECT message
+        FROM deploy_logs
+        WHERE service_name = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT 100
+        """,
+        (service,),
+    ).fetchall()
+    return jsonify([row["message"] for row in rows])
+
+
+init_db()
+
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Render gives PORT
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
