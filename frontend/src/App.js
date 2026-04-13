@@ -3,6 +3,8 @@ import axios from "axios";
 import "./App.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://deploymate-w9wt.onrender.com/";
+const TOKEN_STORAGE_KEY = "deploymateAuthToken";
+const USER_STORAGE_KEY = "deploymateUser";
 
 function ServiceCard({
   name,
@@ -13,6 +15,7 @@ function ServiceCard({
   logsOpen,
   logs,
   logsLoading,
+  canDeploy,
 }) {
   return (
     <article className={`service-card service-card-${service.status || "unknown"}`}>
@@ -29,8 +32,8 @@ function ServiceCard({
       </p>
 
       <div className="actions">
-        <button onClick={() => onDeploy(name)} disabled={deployLoading}>
-          {deployLoading ? "Deploying..." : "Deploy"}
+        <button onClick={() => onDeploy(name)} disabled={deployLoading || !canDeploy}>
+          {!canDeploy ? "Login to Deploy" : deployLoading ? "Deploying..." : "Deploy"}
         </button>
         <button className="secondary" onClick={() => onToggleLogs(name)}>
           {logsOpen ? "Hide Logs" : "View Logs"}
@@ -66,6 +69,12 @@ function App() {
   const [logsMap, setLogsMap] = useState({});
   const [logsLoadingMap, setLogsLoadingMap] = useState({});
 
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY) || "");
+  const [authUser, setAuthUser] = useState(() => localStorage.getItem(USER_STORAGE_KEY) || "");
+
   const fetchServices = async () => {
     try {
       setError("");
@@ -93,16 +102,37 @@ function App() {
     }
   };
 
+  const handleUnauthorized = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setAuthToken("");
+    setAuthUser("");
+    setError("Your session is invalid or expired. Please log in again.");
+  };
+
   const deploy = async (service) => {
+    if (!authToken) {
+      setError("Please log in before deploying services.");
+      return;
+    }
+
     try {
       setDeployingMap((prev) => ({ ...prev, [service]: true }));
-      await axios.post(`${API_BASE_URL}/deploy/${service}`);
+      await axios.post(`${API_BASE_URL}/deploy/${service}`, null, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
       await fetchServices();
       if (openLogs[service]) {
         await fetchLogs(service);
       }
     } catch (err) {
-      setError(`Failed to deploy ${service}.`);
+      if (err.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        setError(`Failed to deploy ${service}.`);
+      }
     } finally {
       setDeployingMap((prev) => ({ ...prev, [service]: false }));
     }
@@ -115,6 +145,42 @@ function App() {
     if (willOpen && !logsMap[service]) {
       await fetchLogs(service);
     }
+  };
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    if (!usernameInput || !passwordInput) {
+      setError("Enter both username and password to continue.");
+      return;
+    }
+
+    try {
+      setError("");
+      setLoginLoading(true);
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, {
+        username: usernameInput,
+        password: passwordInput,
+      });
+
+      localStorage.setItem(TOKEN_STORAGE_KEY, res.data.token);
+      localStorage.setItem(USER_STORAGE_KEY, res.data.username);
+      setAuthToken(res.data.token);
+      setAuthUser(res.data.username);
+      setUsernameInput("");
+      setPasswordInput("");
+    } catch (err) {
+      setError("Login failed. Please check your credentials.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setAuthToken("");
+    setAuthUser("");
+    setError("");
   };
 
   useEffect(() => {
@@ -134,9 +200,37 @@ function App() {
             Monitor service health, roll out deployments, and inspect logs from one place.
           </p>
         </div>
-        <button className="refresh-btn" onClick={fetchServices} disabled={isLoading}>
-          {isLoading ? "Refreshing..." : "Refresh Services"}
-        </button>
+
+        {authToken ? (
+          <div className="auth-panel auth-panel-active">
+            <p className="auth-status">Signed in as <strong>{authUser || "admin"}</strong></p>
+            <button className="secondary" onClick={handleLogout}>Logout</button>
+            <button className="refresh-btn" onClick={fetchServices} disabled={isLoading}>
+              {isLoading ? "Refreshing..." : "Refresh Services"}
+            </button>
+          </div>
+        ) : (
+          <form className="auth-panel" onSubmit={handleLogin}>
+            <p className="auth-title">Admin Login</p>
+            <input
+              type="text"
+              placeholder="Username"
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              autoComplete="username"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              autoComplete="current-password"
+            />
+            <button type="submit" disabled={loginLoading}>
+              {loginLoading ? "Signing in..." : "Login"}
+            </button>
+          </form>
+        )}
       </section>
 
       <section className="stats-grid">
@@ -152,6 +246,7 @@ function App() {
 
       {isLoading && <p className="state-message">Loading services...</p>}
       {error && <p className="error-banner">{error}</p>}
+      {!authToken && <p className="state-message">Deploy actions are locked until you log in.</p>}
       {!isLoading && !error && serviceNames.length === 0 && (
         <p className="state-message">No services configured yet.</p>
       )}
@@ -168,6 +263,7 @@ function App() {
             logsOpen={Boolean(openLogs[serviceName])}
             logs={logsMap[serviceName] || []}
             logsLoading={Boolean(logsLoadingMap[serviceName])}
+            canDeploy={Boolean(authToken)}
           />
         ))}
       </section>
