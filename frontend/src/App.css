@@ -1,6 +1,5 @@
 :root {
-  --bg-1: #f9fafb;
-  --bg-2: #eef2ff;
+  --bg-1: #0b0f14;
   --surface: #ffffff;
   --surface-soft: #f8fafc;
   --text-strong: #1f2937;
@@ -23,10 +22,7 @@ body {
   min-height: 100vh;
   font-family: "Plus Jakarta Sans", "Manrope", "Avenir Next", "Segoe UI", sans-serif;
   color: var(--text-strong);
-  background:
-    radial-gradient(circle at 12% 12%, rgb(34 197 94 / 0.12), transparent 36%),
-    radial-gradient(circle at 88% 8%, rgb(56 189 248 / 0.2), transparent 32%),
-    linear-gradient(165deg, var(--bg-1), var(--bg-2));
+  background: var(--bg-1);
 }
 
 .app-shell {
@@ -36,7 +32,7 @@ body {
 }
 
 .hero {
-  background: linear-gradient(150deg, #ffffff 10%, #f8fafc 100%);
+  background: #ffffff;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
@@ -45,6 +41,50 @@ body {
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
+}
+
+.auth-panel {
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.7rem;
+}
+
+.auth-panel-active {
+  min-width: 265px;
+}
+
+.auth-title {
+  margin: 0 0 0.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.auth-status {
+  margin: 0;
+  color: #334155;
+  font-size: 0.9rem;
+}
+
+.auth-panel input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.48rem 0.62rem;
+  color: #0f172a;
+  background: #fff;
+}
+
+.auth-panel input:focus {
+  outline: 2px solid rgb(15 118 110 / 0.25);
+  border-color: #0f766e;
 }
 
 .eyebrow {
@@ -196,7 +236,7 @@ button {
   border-radius: 10px;
   padding: 0.5rem 0.9rem;
   cursor: pointer;
-  background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+  background: var(--primary);
   color: #fff;
   font-weight: 700;
   transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
@@ -287,6 +327,12 @@ button.secondary {
 
   .refresh-btn {
     width: 100%;
+  }
+
+  .auth-panel,
+  .auth-panel-active {
+    width: 100%;
+    min-width: 0;
   }
 
   .stats-grid {
