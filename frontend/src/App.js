@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://deploymate-w9wt.onrender.com/";
+const RAW_API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || "https://deploymate-backend.onrender.com";
+const API_BASE_URL = RAW_API_BASE_URL.replace(/\/+$/, "");
 const TOKEN_STORAGE_KEY = "deploymateAuthToken";
 const USER_STORAGE_KEY = "deploymateUser";
 

@@ -54,7 +54,7 @@ npm install
 npm start
 ```
 3. Open browser:
-- `http://localhost:3000`
+- `https://deploymate-ashen.vercel.app/`
 
 ## Q: How does the dashboard talk to backend?
 A: Frontend uses:
@@ -62,7 +62,7 @@ A: Frontend uses:
 
 Example in `frontend/.env`:
 ```env
-REACT_APP_API_BASE_URL=http://localhost:5000
+REACT_APP_API_BASE_URL=https://deploymate-ashen.vercel.app/
 ```
 
 ## Q: I get "Login failed". What should I do?
