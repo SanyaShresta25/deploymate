@@ -47,50 +47,6 @@ body {
   gap: 1rem;
 }
 
-.auth-panel {
-  min-width: 240px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  background: rgb(248 250 252 / 0.95);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.7rem;
-}
-
-.auth-panel-active {
-  min-width: 265px;
-}
-
-.auth-title {
-  margin: 0 0 0.15rem;
-  font-weight: 700;
-  color: #0f172a;
-  font-size: 0.92rem;
-}
-
-.auth-status {
-  margin: 0;
-  color: #334155;
-  font-size: 0.9rem;
-}
-
-.auth-panel input {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  font: inherit;
-  font-size: 0.9rem;
-  padding: 0.48rem 0.62rem;
-  color: #0f172a;
-  background: #fff;
-}
-
-.auth-panel input:focus {
-  outline: 2px solid rgb(15 118 110 / 0.25);
-  border-color: #0f766e;
-}
-
 .eyebrow {
   margin: 0;
   font-size: 0.72rem;
@@ -331,12 +287,6 @@ button.secondary {
 
   .refresh-btn {
     width: 100%;
-  }
-
-  .auth-panel,
-  .auth-panel-active {
-    width: 100%;
-    min-width: 0;
   }
 
   .stats-grid {
