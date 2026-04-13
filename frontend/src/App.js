@@ -121,6 +121,7 @@ function App() {
       await axios.post(`${API_BASE_URL}/deploy/${service}`, null, {
         headers: {
           Authorization: `Bearer ${authToken}`,
+          "X-Deploymate-User": authUser || "dashboard-user",
         },
       });
       await fetchServices();
@@ -131,7 +132,7 @@ function App() {
       if (err.response?.status === 401) {
         handleUnauthorized();
       } else {
-        setError(`Failed to deploy ${service}.`);
+        setError(err.response?.data?.error || `Failed to deploy ${service}.`);
       }
     } finally {
       setDeployingMap((prev) => ({ ...prev, [service]: false }));

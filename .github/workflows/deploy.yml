@@ -1,0 +1,40 @@
+name: Safe Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to deploy"
+        required: true
+        type: string
+      requested_by:
+        description: "User who requested deploy"
+        required: false
+        type: string
+      requested_at:
+        description: "UTC timestamp from dashboard"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Show request metadata
+        run: |
+          echo "Deploy request accepted."
+          echo "Service: ${{ inputs.service }}"
+          echo "Requested by: ${{ inputs.requested_by }}"
+          echo "Requested at: ${{ inputs.requested_at }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run safe placeholder deploy
+        run: |
+          echo "Replace this section with real deploy logic."
+          echo "Example: kubectl rollout restart, helm upgrade, terraform apply, etc."

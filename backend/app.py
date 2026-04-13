@@ -1,7 +1,9 @@
 from datetime import datetime
 import hmac
+import json
 import os
 import sqlite3
+from urllib import error, request as urlrequest
 
 from flask import Flask, g, jsonify, request
 from flask_cors import CORS
@@ -10,6 +12,26 @@ app = Flask(__name__)
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_local_env(env_path):
+    if not os.path.exists(env_path):
+        return
+
+    with open(env_path, "r", encoding="utf-8") as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
+load_local_env(os.path.join(BASE_DIR, ".env"))
 DB_PATH = os.environ.get("DEPLOYMATE_DB_PATH", os.path.join(BASE_DIR, "deploymate.db"))
 
 
@@ -84,6 +106,59 @@ def require_auth():
     return None
 
 
+def get_github_settings():
+    return {
+        "token": os.environ.get("DEPLOYMATE_GH_TOKEN", ""),
+        "repo": os.environ.get("DEPLOYMATE_GH_REPO", ""),
+        "workflow": os.environ.get("DEPLOYMATE_GH_WORKFLOW", "deploy.yml"),
+        "ref": os.environ.get("DEPLOYMATE_GH_REF", "main"),
+    }
+
+
+def trigger_github_workflow(service, requested_by):
+    settings = get_github_settings()
+    missing = [key for key in ["token", "repo"] if not settings[key]]
+    if missing:
+        return False, f"Missing GitHub deploy configuration: {', '.join(missing)}"
+
+    url = (
+        f"https://api.github.com/repos/{settings['repo']}/actions/workflows/"
+        f"{settings['workflow']}/dispatches"
+    )
+    payload = {
+        "ref": settings["ref"],
+        "inputs": {
+            "service": service,
+            "requested_by": requested_by,
+            "requested_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        },
+    }
+
+    req = urlrequest.Request(
+        url=url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {settings['token']}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+            "User-Agent": "DeployMate",
+        },
+    )
+
+    try:
+        with urlrequest.urlopen(req, timeout=10) as response:
+            if response.getcode() == 204:
+                return True, "Workflow dispatch accepted by GitHub Actions."
+            return False, f"Unexpected GitHub response status: {response.getcode()}"
+    except error.HTTPError as http_err:
+        details = http_err.read().decode("utf-8", errors="replace")
+        return False, f"GitHub API error ({http_err.code}): {details}"
+    except error.URLError as url_err:
+        return False, f"Failed to reach GitHub API: {url_err.reason}"
+
+
 @app.route("/")
 def home():
     return {"message": "DeployMate API is running"}
@@ -141,21 +216,32 @@ def deploy(service):
     if not service_row:
         return {"error": "service not found"}, 404
 
-    now = datetime.utcnow().isoformat(sep=" ")
-    db.execute(
-        "UPDATE services SET status = ?, last_deployed = ? WHERE name = ?",
-        ("running", now, service),
-    )
+    requested_by = request.headers.get("X-Deploymate-User", "dashboard-user")
+    success, trigger_message = trigger_github_workflow(service, requested_by)
+
+    now = datetime.utcnow().isoformat(sep=" ", timespec="seconds")
+    log_prefix = "DEPLOY REQUESTED" if success else "DEPLOY FAILED"
+    log_message = f"[{log_prefix}] {service}: {trigger_message}"
+
+    if success:
+        db.execute(
+            "UPDATE services SET status = ?, last_deployed = ? WHERE name = ?",
+            ("deploying", now, service),
+        )
+
     db.execute(
         """
         INSERT INTO deploy_logs (service_name, message, created_at)
         VALUES (?, ?, ?)
         """,
-        (service, f"{service} deployed at {now}", now),
+        (service, log_message, now),
     )
     db.commit()
 
-    return {"message": f"{service} deployed"}
+    if not success:
+        return {"error": trigger_message}, 502
+
+    return {"message": f"{service} deployment requested"}
 
 
 @app.route("/logs/<service>")
